@@ -329,13 +329,16 @@ def synth_chime(path):
         for f, a in partials:
             vib = 1.0 + 0.002 * math.sin(2 * math.pi * 5.0 * t)
             v += a * math.sin(2 * math.pi * f * vib * t)
-        v += 1.2 * math.exp(-t / 0.25) * math.sin(2 * math.pi * 55.0 * t)
-        samples.append(int(max(-1.0, min(1.0, v * env * 0.28)) * 32767))
+        v += 0.9 * math.exp(-t / 0.25) * math.sin(2 * math.pi * 55.0 * t)
+        samples.append(v * env)
+    # normalize to 95% of full scale — as loud as possible without clipping
+    gain = 0.95 / (max(abs(s) for s in samples) or 1.0)
+    pcm = [int(max(-1.0, min(1.0, s * gain)) * 32767) for s in samples]
     with wave.open(path, "w") as w:
         w.setnchannels(1)
         w.setsampwidth(2)
         w.setframerate(rate)
-        w.writeframes(struct.pack("<%dh" % n, *samples))
+        w.writeframes(struct.pack("<%dh" % n, *pcm))
 
 
 def play_sound():
