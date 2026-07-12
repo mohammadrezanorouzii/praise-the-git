@@ -1,9 +1,10 @@
 # darksouls-gitpush — Dark Souls banner on git push.
-# Sourced from ~/.bashrc. Wraps `git` so a successful `git push` shows
-# "CODE PUSHED" (gold) and a failed one shows "YOU DIED" (red).
+# Sourced from ~/.bashrc or ~/.zshrc. Wraps `git` so a successful `git push`
+# shows "CODE PUSHED" (gold) and a failed one shows "YOU DIED" (red).
 # The push's exit code is preserved either way.
 
-CODE_PUSHED_BIN="${CODE_PUSHED_BIN:-$HOME/.local/bin/code-pushed}"
+# resolved from PATH (pipx/pip entry point or the install.sh symlink)
+CODE_PUSHED_BIN="${CODE_PUSHED_BIN:-code-pushed}"
 
 git() {
   if [ "$1" = "push" ]; then
