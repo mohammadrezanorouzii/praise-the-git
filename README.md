@@ -94,8 +94,8 @@ directory (`~/.local/share/code-pushed` on Linux,
 ## Project layout
 
 ```
-src/darksouls_gitpush/cli.py     # the whole program: rasterizer, renderer, animation, sound
-src/darksouls_gitpush/assets/    # Cinzel.ttf (OFL licensed, from Google Fonts)
+src/cli.py                       # the whole program: rasterizer, renderer, animation, sound
+src/assets/                      # Cinzel.ttf (OFL licensed, from Google Fonts)
 code-pushed                      # launcher to run from the repo without installing
 shell/git-banner.sh              # git() wrapper + gitpush-test (bash/zsh)
 shell/gitpush.cmd                # Windows cmd shim

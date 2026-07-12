@@ -19,8 +19,9 @@ classifiers = [
 [project.scripts]
 code-pushed = "darksouls_gitpush.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = ["darksouls_gitpush", "darksouls_gitpush.assets"]
+package-dir = { darksouls_gitpush = "src" }
 
 [tool.setuptools.package-data]
 darksouls_gitpush = ["assets/*.ttf"]
