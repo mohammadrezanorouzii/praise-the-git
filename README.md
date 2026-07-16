@@ -2,96 +2,131 @@
 
 *— Prepare to Push Edition —*
 
-A Dark Souls style banner for your terminal: when `git push` succeeds you get
-a golden **CODE PUSHED** across the screen — complete with the metallic
-gradient, a sweeping sheen, fade in/out, a solemn chime, and a souls counter
-(your total commit count). When the push fails, you get the blood-red
-**YOU DIED**.
+Dark Souls banners for your git commands — metallic sheen, fade in/out,
+solemn chime, and a souls counter (your total commit count) included.
+Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 
-More git moments are covered too:
-
-| git command                  | outcome  | banner                                |
-| ---------------------------- | -------- | ------------------------------------- |
-| `git push`                   | success  | **CODE PUSHED** (gold, souls counter) |
-| `git push`                   | failure  | **YOU DIED** (red)                    |
-| `git merge` / `git rebase`   | success  | **VICTORY ACHIEVED** (gold, souls)    |
-| `git merge` / `git rebase`   | conflict | **YOU DIED** (red)                    |
-| `git checkout -b` / `switch -c` | new branch | its name as a silver area-name banner, like entering a new zone |
-| `git stash`                  | stashed  | **HUMANITY RESTORED** (silver)        |
+| git command                  | outcome    | banner               |
+| ---------------------------- | ---------- | -------------------- |
+| `git push`                   | success    | **CODE PUSHED**      |
+| `git push`                   | failure    | **YOU DIED**         |
+| `git merge` / `git rebase`   | success    | **VICTORY ACHIEVED** |
+| `git merge` / `git rebase`   | conflict   | **YOU DIED**         |
+| `git checkout -b` / `switch -c` | new branch | its name, like entering a new area |
+| `git stash`                  | stashed    | **HUMANITY RESTORED** |
 
 (`--abort`/`--quit` calls and a `git stash` that had nothing to save stay
 silent; the git exit code is always preserved.)
 
-Inspired by the "Email Sent" Dark Souls browser extension, rebuilt for the
-terminal. Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
-
-## How it looks
-
-The text is rendered with Cinzel (the free Trajan-style typeface — the same
-letterform family Dark Souls uses), rasterized with antialiasing and drawn
-using quadrant block characters (`▀▌▞▟`…), which gives a 2x2 grid of pixels
-per terminal cell. Needs a truecolor terminal (any modern one).
-
 ## Install
 
-### Linux / macOS
+### macOS / Linux — one-liner install
 
 ```sh
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/mohammadrezanorouzii/praise-the-git/main/install.sh | bash
 ```
 
-Then restart your shell (or `source ~/.bashrc` / `source ~/.zshrc`) and run
-`praise-test` to preview. The installer:
+This script will:
 
-- installs the `praise` command (via `pipx` if present, else
-  `pip install --user`, else a symlink that runs from this checkout), and
-- adds one guarded `source` line to your `~/.bashrc` and/or `~/.zshrc` that
-  loads the `git push` wrapper.
+- Download the app into `~/.local/share/praise-the-git/app` (no sudo required)
+- Install the `praise` command — via `pipx` if you have it, else
+  `pip install --user`, else a plain symlink in `~/.local/bin`
+- Add one marked block to your `~/.bashrc` / `~/.zshrc` that loads the git
+  wrapper — this is what makes the banners fire automatically
 
-### Windows (cmd)
+It's idempotent — re-running it later updates the app.
+
+> **Custom install dir** — set `PRAISE_INSTALL_DIR=/your/path` before piping
+> to bash to put the app somewhere else.
+
+Then reload your shell and check it works:
+
+```sh
+source ~/.bashrc     # or source ~/.zshrc, or just open a new terminal
+praise-test          # golden CODE PUSHED banner + chime
+```
+
+If `praise` isn't found, `~/.local/bin` is missing from your PATH — add
+`export PATH="$HOME/.local/bin:$PATH"` to your rc file and reload again.
+From here on, just use git normally: the banners appear on their own.
+
+### Windows — one-liner install (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/mohammadrezanorouzii/praise-the-git/main/install.ps1 | iex
+```
+
+This script will:
+
+- Check that Python 3 is installed (get it from
+  [python.org](https://www.python.org/downloads/) with "Add to PATH"
+  checked — the script tells you if it's missing)
+- Download the app into `%LOCALAPPDATA%\praise-the-git\app`
+- pip-install the `praise` command and put `gitpush.cmd` into your
+  per-user Python Scripts directory
+- Add that Scripts directory to your user PATH if needed
+
+Open a **new** terminal after installation, then:
 
 ```bat
-install.bat
+praise                 # preview the banner
+gitpush origin main    # instead of "git push"
 ```
 
-This pip-installs the `praise` command and drops `gitpush.cmd` into your
-per-user Scripts directory. In cmd, use **`gitpush`** instead of `git push`:
+cmd has no shell functions, so plain `git push` can't be intercepted the
+way it is on Linux/macOS — `gitpush` runs the real push and shows the
+banner based on its exit code. Works in classic cmd and Windows Terminal.
 
-```bat
-gitpush origin main
-```
-
-(cmd has no shell functions, so plain `git push` can't be wrapped the way it
-is on Linux/macOS — `gitpush` runs the real push and shows the banner based
-on its exit code. Everything works in both classic cmd and Windows Terminal;
-ANSI colors are enabled automatically.)
-
-### Any platform, manually
+### Manual install
 
 ```sh
-pip install .        # or: pipx install .
-praise          # try it
+# just the `praise` command, no automatic git integration:
+pipx install git+https://github.com/mohammadrezanorouzii/praise-the-git.git
+# (or) pip install git+https://github.com/mohammadrezanorouzii/praise-the-git.git
+
+# for the automatic banners, clone and run the installer from the checkout:
+git clone https://github.com/mohammadrezanorouzii/praise-the-git.git
+cd praise-the-git && ./install.sh      # Windows: install.bat
 ```
 
-## Usage
+## Test
 
-On Linux/macOS the banners fire automatically on the git commands in the
-table above (via a shell wrapper function, so interactive shells only —
-scripts and non-interactive shells are unaffected). Preview any time with
-`praise-test [fail|victory|branch|stash]` (nothing touches git state).
-
-The renderer is a general-purpose command you can use for anything:
+Preview every banner without touching git state (nothing is pushed,
+merged, or stashed — git isn't even called):
 
 ```sh
-praise                       # "CODE PUSHED", gold
-praise "BONFIRE LIT"         # any text
-praise --red "YOU DIED"      # red theme
+praise-test            # CODE PUSHED + souls counter
+praise-test fail       # YOU DIED
+praise-test victory    # VICTORY ACHIEVED + souls counter
+praise-test branch     # UNDEAD BURG, area-name style
+praise-test stash      # HUMANITY RESTORED
+```
+
+The `praise` command itself takes any text, so you can test themes, the
+souls counter, and static output directly:
+
+```sh
+praise "BONFIRE LIT"                  # any text, gold
+praise --red "YOU DIED"               # red theme
 praise --theme silver "UNDEAD BURG"   # gold / red / silver
 praise --souls 1247 "CODE PUSHED"     # souls counter under the banner
-praise --no-sound "QUIET"    # skip the chime
-praise --dump "TEST"         # print one static frame (no animation)
-praise --png out.png "TEST"  # render a frame to an image
+praise --no-sound "QUIET"             # skip the chime
+praise --dump "TEST"                  # one static frame, no animation
+praise --png out.png "TEST"           # render a frame to an image file
 ```
+
+To test the real git integration end to end, make a throwaway repo and
+trigger a banner:
+
+```sh
+mkdir /tmp/playground && cd /tmp/playground && git init
+echo hi > file.txt && git add . && git commit -m "first"
+git checkout -b feature/bonfire     # area-name banner
+echo more >> file.txt && git stash  # HUMANITY RESTORED
+```
+
+Banners only animate in interactive terminals — scripts, CI, and
+non-interactive shells stay silent by design.
 
 ## Requirements
 
@@ -102,35 +137,59 @@ praise --png out.png "TEST"  # render a frame to an image
 - Sound is built in: `winsound` on Windows, `afplay` on macOS,
   `paplay`/`aplay`/`ffplay` on Linux — whichever exists; silence otherwise
 
-## Sound
+## How sound effects work
 
-A synthesized chord swell is generated on first run into the app's data
-directory (`~/.local/share/praise-the-git` on Linux,
-`~/Library/Application Support/praise-the-git` on macOS,
-`%LOCALAPPDATA%\praise-the-git` on Windows). Replace `chime.wav` there with any
-`.wav` (e.g. the real "Victory Achieved" sound) to use your own.
+A solemn chord swell is synthesized (pure stdlib, no audio dependencies)
+on first run and saved into the app's data directory:
 
-## Project layout
+- Linux: `~/.local/share/praise-the-git/chime.wav`
+- macOS: `~/Library/Application Support/praise-the-git/chime.wav`
+- Windows: `%LOCALAPPDATA%\praise-the-git\chime.wav`
 
-```
-src/cli.py                       # the whole program: rasterizer, renderer, animation, sound
-src/assets/                      # Cinzel.ttf (OFL licensed, from Google Fonts)
-praise                           # launcher to run from the repo without installing
-shell/git-banner.sh              # git() wrapper + praise-test (bash/zsh)
-shell/gitpush.cmd                # Windows cmd shim
-install.sh / install.bat         # per-platform installers, idempotent
-pyproject.toml                   # pip/pipx packaging
-```
+Playback uses whatever the OS provides: `winsound` on Windows, `afplay`
+on macOS, `paplay`/`aplay`/`ffplay` on Linux — silence if none exists.
+Want a different sound? Replace that `chime.wav` with any `.wav` file
+(e.g. the real "Victory Achieved" sound) and it plays instead. Delete it
+to get the synthesized one back.
 
 ## Uninstall
 
-- Linux/macOS: remove the `# >>> praise-the-git ... <<<` block from your rc
-  file(s), then `pipx uninstall praise-the-git` (or `pip uninstall`, or
-  delete the `~/.local/bin/praise` symlink), and delete the data dir.
-- Windows: `pip uninstall praise-the-git` and delete `gitpush.cmd` from
-  your Scripts directory.
+### Linux / macOS
+
+```sh
+# 1. remove the shell integration block from your rc file(s)
+sed -i '/>>> praise-the-git/,/<<< praise-the-git/d' ~/.bashrc
+sed -i '/>>> praise-the-git/,/<<< praise-the-git/d' ~/.zshrc   # if you use zsh
+
+# 2. remove the command (use the one matching how it was installed)
+pipx uninstall praise-the-git        # pipx install
+pip uninstall praise-the-git         # pip install
+rm ~/.local/bin/praise               # symlink fallback
+
+# 3. remove the downloaded app and the generated sound file
+rm -rf ~/.local/share/praise-the-git
+```
+
+### Windows
+
+```bat
+rem 1. remove the package
+pip uninstall praise-the-git
+
+rem 2. find and delete the gitpush shim
+where gitpush
+del "<the path that 'where gitpush' printed>"
+
+rem 3. remove the downloaded app and the generated sound file
+rmdir /s /q "%LOCALAPPDATA%\praise-the-git"
+```
 
 ## License
 
 Code: MIT. The bundled Cinzel font is licensed under the SIL Open Font
 License 1.1 (https://openfontlicense.org), © The Cinzel Project Authors.
+
+---
+
+*Inspired by the "Email Sent" Dark Souls browser extension, rebuilt for
+the terminal.*
