@@ -1,11 +1,34 @@
 #!/usr/bin/env bash
 # praise-the-git installer for Linux & macOS. Idempotent, safe to re-run.
+# Works two ways:
+#   from a checkout:  ./install.sh
+#   piped from curl:  curl -fsSL https://raw.githubusercontent.com/mohammadrezanorouzii/praise-the-git/main/install.sh | bash
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="mohammadrezanorouzii/praise-the-git"
 BIN_DIR="$HOME/.local/bin"
 MARKER=">>> praise-the-git (Dark Souls git banner) >>>"
 LEGACY_MARKER=">>> code-pushed (Dark Souls git banner) >>>"
+
+# --- 0. locate the app (or fetch it, when piped from curl) ---------------
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ] \
+   && [ -f "$(dirname "${BASH_SOURCE[0]}")/pyproject.toml" ]; then
+  PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  PROJECT_DIR="${PRAISE_INSTALL_DIR:-$HOME/.local/share/praise-the-git/app}"
+  echo "downloading praise-the-git into $PROJECT_DIR ..."
+  if command -v git >/dev/null 2>&1; then
+    if [ -d "$PROJECT_DIR/.git" ]; then
+      git -C "$PROJECT_DIR" pull --ff-only -q
+    else
+      git clone -q --depth 1 "https://github.com/$REPO.git" "$PROJECT_DIR"
+    fi
+  else
+    mkdir -p "$PROJECT_DIR"
+    curl -fsSL "https://github.com/$REPO/archive/refs/heads/main.tar.gz" \
+      | tar -xz -C "$PROJECT_DIR" --strip-components=1
+  fi
+fi
 
 # --- 1. install the `praise` command -------------------------------------
 INSTALLED=""
