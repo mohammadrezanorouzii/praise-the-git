@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# darksouls-gitpush installer for Linux & macOS. Idempotent, safe to re-run.
+# praise-the-git installer for Linux & macOS. Idempotent, safe to re-run.
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$HOME/.local/bin"
-MARKER=">>> code-pushed (Dark Souls git banner) >>>"
+MARKER=">>> praise-the-git (Dark Souls git banner) >>>"
+LEGACY_MARKER=">>> code-pushed (Dark Souls git banner) >>>"
 
-# --- 1. install the `code-pushed` command -------------------------------
+# --- 1. install the `praise` command -------------------------------------
 INSTALLED=""
 if command -v pipx >/dev/null 2>&1; then
   if pipx install --force "$PROJECT_DIR" >/dev/null; then
@@ -21,14 +22,21 @@ fi
 if [ -z "$INSTALLED" ]; then
   # zero-dependency fallback: run straight from this checkout
   mkdir -p "$BIN_DIR"
-  ln -sf "$PROJECT_DIR/code-pushed" "$BIN_DIR/code-pushed"
+  ln -sf "$PROJECT_DIR/praise" "$BIN_DIR/praise"
   INSTALLED="symlink -> $PROJECT_DIR"
 fi
-echo "code-pushed installed via: $INSTALLED"
+# clean up the pre-rename symlink, if that install path was used
+[ -L "$BIN_DIR/code-pushed" ] && rm -f "$BIN_DIR/code-pushed"
+echo "praise installed via: $INSTALLED"
 
 # --- 2. shell integration (bash + zsh) ----------------------------------
 add_block() {
   local rc="$1"
+  # migrate: drop the block added under the project's old name
+  if grep -qF "$LEGACY_MARKER" "$rc" 2>/dev/null; then
+    sed -i.praise-bak "/$LEGACY_MARKER/,/<<< code-pushed <<</d" "$rc"
+    echo "removed old code-pushed integration from $rc"
+  fi
   if grep -qF "$MARKER" "$rc" 2>/dev/null; then
     echo "shell integration already present in $rc"
     return
@@ -37,7 +45,7 @@ add_block() {
 
 # $MARKER
 [ -f "$PROJECT_DIR/shell/git-banner.sh" ] && . "$PROJECT_DIR/shell/git-banner.sh"
-# <<< code-pushed <<<
+# <<< praise-the-git <<<
 EOF
   echo "added shell integration to $rc"
 }
@@ -59,7 +67,7 @@ fi
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
-  *) echo "NOTE: if 'code-pushed' is not found, add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+  *) echo "NOTE: if 'praise' is not found, add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
 esac
 
-echo "done. Restart your shell (or 'source' your rc file), then run: gitpush-test"
+echo "done. Restart your shell (or 'source' your rc file), then run: praise-test"

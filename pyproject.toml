@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "darksouls-gitpush"
-version = "1.0.0"
-description = "Dark Souls style CODE PUSHED / YOU DIED banner for your terminal"
+name = "praise-the-git"
+version = "1.1.0"
+description = "Praise the Git \\[T]/ — Dark Souls style banners for git: CODE PUSHED, YOU DIED, VICTORY ACHIEVED"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
@@ -17,11 +17,11 @@ classifiers = [
 ]
 
 [project.scripts]
-code-pushed = "darksouls_gitpush.cli:main"
+praise = "praise_the_git.cli:main"
 
 [tool.setuptools]
-packages = ["darksouls_gitpush", "darksouls_gitpush.assets"]
-package-dir = { darksouls_gitpush = "src" }
+packages = ["praise_the_git", "praise_the_git.assets"]
+package-dir = { praise_the_git = "src" }
 
 [tool.setuptools.package-data]
-darksouls_gitpush = ["assets/*.ttf"]
+praise_the_git = ["assets/*.ttf"]

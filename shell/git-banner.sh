@@ -1,4 +1,4 @@
-# darksouls-gitpush — Dark Souls banners for git.
+# praise-the-git — Praise the Git \[T]/ — Dark Souls banners for git.
 # Sourced from ~/.bashrc or ~/.zshrc. Wraps `git` so:
 #   push          ok: "CODE PUSHED" (gold)       fail: "YOU DIED" (red)
 #   merge/rebase  ok: "VICTORY ACHIEVED" (gold)  fail: "YOU DIED" (red)
@@ -7,13 +7,13 @@
 # The git exit code is preserved either way.
 
 # resolved from PATH (pipx/pip entry point or the install.sh symlink)
-CODE_PUSHED_BIN="${CODE_PUSHED_BIN:-code-pushed}"
+PRAISE_BIN="${PRAISE_BIN:-praise}"
 
 # gold success banner with a souls counter (total commits on HEAD)
-_code_pushed_victory() {
+_praise_victory() {
   local _souls
   _souls=$(command git rev-list --count HEAD 2>/dev/null)
-  "$CODE_PUSHED_BIN" ${_souls:+--souls "$_souls"} "$1"
+  "$PRAISE_BIN" ${_souls:+--souls "$_souls"} "$1"
 }
 
 git() {
@@ -22,9 +22,9 @@ git() {
     push)
       command git "$@"; _rc=$?
       if [ $_rc -eq 0 ]; then
-        _code_pushed_victory "CODE PUSHED"
+        _praise_victory "CODE PUSHED"
       else
-        "$CODE_PUSHED_BIN" --red "YOU DIED"
+        "$PRAISE_BIN" --red "YOU DIED"
       fi
       return $_rc
       ;;
@@ -35,9 +35,9 @@ git() {
       esac
       command git "$@"; _rc=$?
       if [ $_rc -eq 0 ]; then
-        _code_pushed_victory "VICTORY ACHIEVED"
+        _praise_victory "VICTORY ACHIEVED"
       else
-        "$CODE_PUSHED_BIN" --red "YOU DIED"
+        "$PRAISE_BIN" --red "YOU DIED"
       fi
       return $_rc
       ;;
@@ -49,7 +49,7 @@ git() {
           command git "$@"; _rc=$?
           if [ $_rc -eq 0 ] && [ "$(command git rev-parse -q --verify \
                 refs/stash 2>/dev/null)" != "$_before" ]; then
-            "$CODE_PUSHED_BIN" --theme silver "HUMANITY RESTORED"
+            "$PRAISE_BIN" --theme silver "HUMANITY RESTORED"
           fi
           return $_rc
           ;;
@@ -70,7 +70,7 @@ git() {
         local _br
         _br=$(command git branch --show-current 2>/dev/null)
         if [ -n "$_br" ]; then
-          "$CODE_PUSHED_BIN" --theme silver \
+          "$PRAISE_BIN" --theme silver \
             "$(printf '%s' "$_br" | tr '[:lower:]' '[:upper:]')"
         fi
       fi
@@ -81,17 +81,17 @@ git() {
 }
 
 # Preview the banners without touching git state.
-#   gitpush-test          -> "CODE PUSHED" (gold, with souls counter)
-#   gitpush-test fail     -> "YOU DIED" (red)
-#   gitpush-test victory  -> "VICTORY ACHIEVED" (gold, with souls counter)
-#   gitpush-test branch   -> "UNDEAD BURG" (silver area banner)
-#   gitpush-test stash    -> "HUMANITY RESTORED" (silver)
-gitpush-test() {
+#   praise-test          -> "CODE PUSHED" (gold, with souls counter)
+#   praise-test fail     -> "YOU DIED" (red)
+#   praise-test victory  -> "VICTORY ACHIEVED" (gold, with souls counter)
+#   praise-test branch   -> "UNDEAD BURG" (silver area banner)
+#   praise-test stash    -> "HUMANITY RESTORED" (silver)
+praise-test() {
   case "${1:-}" in
-    fail)    "$CODE_PUSHED_BIN" --red "YOU DIED" ;;
-    victory) _code_pushed_victory "VICTORY ACHIEVED" ;;
-    branch)  "$CODE_PUSHED_BIN" --theme silver "UNDEAD BURG" ;;
-    stash)   "$CODE_PUSHED_BIN" --theme silver "HUMANITY RESTORED" ;;
-    *)       _code_pushed_victory "CODE PUSHED" ;;
+    fail)    "$PRAISE_BIN" --red "YOU DIED" ;;
+    victory) _praise_victory "VICTORY ACHIEVED" ;;
+    branch)  "$PRAISE_BIN" --theme silver "UNDEAD BURG" ;;
+    stash)   "$PRAISE_BIN" --theme silver "HUMANITY RESTORED" ;;
+    *)       _praise_victory "CODE PUSHED" ;;
   esac
 }

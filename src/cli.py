@@ -1,14 +1,14 @@
-"""Dark Souls style terminal banner — "CODE PUSHED" and friends.
+"""Praise the Git \\[T]/ — Dark Souls style terminal banners.
 
 Usage:
-    code-pushed                     # shows "CODE PUSHED" (gold)
-    code-pushed "VICTORY ACHIEVED"  # any text
-    code-pushed --red "YOU DIED"    # blood-red theme
-    code-pushed --theme silver "UNDEAD BURG"  # gold / red / silver
-    code-pushed --souls 1247 ...    # souls counter under the banner
-    code-pushed --no-sound ...      # silent
-    code-pushed --dump ...          # print one static frame (for testing)
-    code-pushed --png out.png ...   # render a frame to an image (for testing)
+    praise                     # shows "CODE PUSHED" (gold)
+    praise "VICTORY ACHIEVED"  # any text
+    praise --red "YOU DIED"    # blood-red theme
+    praise --theme silver "UNDEAD BURG"  # gold / red / silver
+    praise --souls 1247 ...    # souls counter under the banner
+    praise --no-sound ...      # silent
+    praise --dump ...          # print one static frame (for testing)
+    praise --png out.png ...   # render a frame to an image (for testing)
 
 Rendering: if PIL is available, the text is rasterized with a real serif
 font (Cinzel — the Trajan-style face Dark Souls uses — falling back to a
@@ -33,13 +33,13 @@ PKG_DIR = os.path.dirname(os.path.realpath(__file__))
 def _data_dir():
     if os.name == "nt":
         base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-        return os.path.join(base, "code-pushed")
+        return os.path.join(base, "praise-the-git")
     if sys.platform == "darwin":
         return os.path.join(os.path.expanduser("~"), "Library",
-                            "Application Support", "code-pushed")
+                            "Application Support", "praise-the-git")
     base = os.environ.get("XDG_DATA_HOME",
                           os.path.join(os.path.expanduser("~"), ".local", "share"))
-    return os.path.join(base, "code-pushed")
+    return os.path.join(base, "praise-the-git")
 
 
 DATA_DIR = _data_dir()
@@ -541,7 +541,9 @@ def dump_png(text, theme, out_path, shine=True):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Dark Souls style terminal banner")
+    ap = argparse.ArgumentParser(
+        prog="praise",
+        description="Praise the Git \\[T]/ — Dark Souls style terminal banner")
     ap.add_argument("text", nargs="*", help='banner text (default: "CODE PUSHED")')
     ap.add_argument("--red", action="store_true", help="blood-red theme (YOU DIED)")
     ap.add_argument("--theme", choices=sorted(THEMES),

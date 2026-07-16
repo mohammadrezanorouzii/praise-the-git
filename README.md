@@ -1,4 +1,6 @@
-# darksouls-gitpush
+# Praise the Git &nbsp; \\[T]/
+
+*— Prepare to Push Edition —*
 
 A Dark Souls style banner for your terminal: when `git push` succeeds you get
 a golden **CODE PUSHED** across the screen — complete with the metallic
@@ -39,9 +41,9 @@ per terminal cell. Needs a truecolor terminal (any modern one).
 ```
 
 Then restart your shell (or `source ~/.bashrc` / `source ~/.zshrc`) and run
-`gitpush-test` to preview. The installer:
+`praise-test` to preview. The installer:
 
-- installs the `code-pushed` command (via `pipx` if present, else
+- installs the `praise` command (via `pipx` if present, else
   `pip install --user`, else a symlink that runs from this checkout), and
 - adds one guarded `source` line to your `~/.bashrc` and/or `~/.zshrc` that
   loads the `git push` wrapper.
@@ -52,7 +54,7 @@ Then restart your shell (or `source ~/.bashrc` / `source ~/.zshrc`) and run
 install.bat
 ```
 
-This pip-installs the `code-pushed` command and drops `gitpush.cmd` into your
+This pip-installs the `praise` command and drops `gitpush.cmd` into your
 per-user Scripts directory. In cmd, use **`gitpush`** instead of `git push`:
 
 ```bat
@@ -68,7 +70,7 @@ ANSI colors are enabled automatically.)
 
 ```sh
 pip install .        # or: pipx install .
-code-pushed          # try it
+praise          # try it
 ```
 
 ## Usage
@@ -76,19 +78,19 @@ code-pushed          # try it
 On Linux/macOS the banners fire automatically on the git commands in the
 table above (via a shell wrapper function, so interactive shells only —
 scripts and non-interactive shells are unaffected). Preview any time with
-`gitpush-test [fail|victory|branch|stash]` (nothing touches git state).
+`praise-test [fail|victory|branch|stash]` (nothing touches git state).
 
 The renderer is a general-purpose command you can use for anything:
 
 ```sh
-code-pushed                       # "CODE PUSHED", gold
-code-pushed "BONFIRE LIT"         # any text
-code-pushed --red "YOU DIED"      # red theme
-code-pushed --theme silver "UNDEAD BURG"   # gold / red / silver
-code-pushed --souls 1247 "CODE PUSHED"     # souls counter under the banner
-code-pushed --no-sound "QUIET"    # skip the chime
-code-pushed --dump "TEST"         # print one static frame (no animation)
-code-pushed --png out.png "TEST"  # render a frame to an image
+praise                       # "CODE PUSHED", gold
+praise "BONFIRE LIT"         # any text
+praise --red "YOU DIED"      # red theme
+praise --theme silver "UNDEAD BURG"   # gold / red / silver
+praise --souls 1247 "CODE PUSHED"     # souls counter under the banner
+praise --no-sound "QUIET"    # skip the chime
+praise --dump "TEST"         # print one static frame (no animation)
+praise --png out.png "TEST"  # render a frame to an image
 ```
 
 ## Requirements
@@ -103,9 +105,9 @@ code-pushed --png out.png "TEST"  # render a frame to an image
 ## Sound
 
 A synthesized chord swell is generated on first run into the app's data
-directory (`~/.local/share/code-pushed` on Linux,
-`~/Library/Application Support/code-pushed` on macOS,
-`%LOCALAPPDATA%\code-pushed` on Windows). Replace `chime.wav` there with any
+directory (`~/.local/share/praise-the-git` on Linux,
+`~/Library/Application Support/praise-the-git` on macOS,
+`%LOCALAPPDATA%\praise-the-git` on Windows). Replace `chime.wav` there with any
 `.wav` (e.g. the real "Victory Achieved" sound) to use your own.
 
 ## Project layout
@@ -113,8 +115,8 @@ directory (`~/.local/share/code-pushed` on Linux,
 ```
 src/cli.py                       # the whole program: rasterizer, renderer, animation, sound
 src/assets/                      # Cinzel.ttf (OFL licensed, from Google Fonts)
-code-pushed                           # launcher to run from the repo without installing
-shell/git-banner.sh              # git() wrapper + gitpush-test (bash/zsh)
+praise                           # launcher to run from the repo without installing
+shell/git-banner.sh              # git() wrapper + praise-test (bash/zsh)
 shell/gitpush.cmd                # Windows cmd shim
 install.sh / install.bat         # per-platform installers, idempotent
 pyproject.toml                   # pip/pipx packaging
@@ -122,10 +124,10 @@ pyproject.toml                   # pip/pipx packaging
 
 ## Uninstall
 
-- Linux/macOS: remove the `# >>> code-pushed ... <<<` block from your rc
-  file(s), then `pipx uninstall darksouls-gitpush` (or `pip uninstall`, or
-  delete the `~/.local/bin/code-pushed` symlink), and delete the data dir.
-- Windows: `pip uninstall darksouls-gitpush` and delete `gitpush.cmd` from
+- Linux/macOS: remove the `# >>> praise-the-git ... <<<` block from your rc
+  file(s), then `pipx uninstall praise-the-git` (or `pip uninstall`, or
+  delete the `~/.local/bin/praise` symlink), and delete the data dir.
+- Windows: `pip uninstall praise-the-git` and delete `gitpush.cmd` from
   your Scripts directory.
 
 ## License

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run darksouls-gitpush straight from the repo (no pip install needed)."""
+"""Run praise-the-git straight from the repo (no pip install needed)."""
 import os
 import sys
 
