@@ -2,8 +2,23 @@
 
 A Dark Souls style banner for your terminal: when `git push` succeeds you get
 a golden **CODE PUSHED** across the screen — complete with the metallic
-gradient, a sweeping sheen, fade in/out, and a solemn chime. When the push
-fails, you get the blood-red **YOU DIED**.
+gradient, a sweeping sheen, fade in/out, a solemn chime, and a souls counter
+(your total commit count). When the push fails, you get the blood-red
+**YOU DIED**.
+
+More git moments are covered too:
+
+| git command                  | outcome  | banner                                |
+| ---------------------------- | -------- | ------------------------------------- |
+| `git push`                   | success  | **CODE PUSHED** (gold, souls counter) |
+| `git push`                   | failure  | **YOU DIED** (red)                    |
+| `git merge` / `git rebase`   | success  | **VICTORY ACHIEVED** (gold, souls)    |
+| `git merge` / `git rebase`   | conflict | **YOU DIED** (red)                    |
+| `git checkout -b` / `switch -c` | new branch | its name as a silver area-name banner, like entering a new zone |
+| `git stash`                  | stashed  | **HUMANITY RESTORED** (silver)        |
+
+(`--abort`/`--quit` calls and a `git stash` that had nothing to save stay
+silent; the git exit code is always preserved.)
 
 Inspired by the "Email Sent" Dark Souls browser extension, rebuilt for the
 terminal. Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
@@ -12,8 +27,8 @@ terminal. Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 
 The text is rendered with Cinzel (the free Trajan-style typeface — the same
 letterform family Dark Souls uses), rasterized with antialiasing and drawn
-using half-block characters (`▀`), which gives two independently colored
-pixels per terminal cell. Needs a truecolor terminal (any modern one).
+using quadrant block characters (`▀▌▞▟`…), which gives a 2x2 grid of pixels
+per terminal cell. Needs a truecolor terminal (any modern one).
 
 ## Install
 
@@ -58,10 +73,10 @@ code-pushed          # try it
 
 ## Usage
 
-On Linux/macOS the banner fires automatically on `git push` (via a shell
-wrapper function, so real pushes only — scripts and non-interactive shells
-are unaffected). Preview any time with `gitpush-test` / `gitpush-test fail`
-(nothing is pushed; git isn't even called).
+On Linux/macOS the banners fire automatically on the git commands in the
+table above (via a shell wrapper function, so interactive shells only —
+scripts and non-interactive shells are unaffected). Preview any time with
+`gitpush-test [fail|victory|branch|stash]` (nothing touches git state).
 
 The renderer is a general-purpose command you can use for anything:
 
@@ -69,6 +84,8 @@ The renderer is a general-purpose command you can use for anything:
 code-pushed                       # "CODE PUSHED", gold
 code-pushed "BONFIRE LIT"         # any text
 code-pushed --red "YOU DIED"      # red theme
+code-pushed --theme silver "UNDEAD BURG"   # gold / red / silver
+code-pushed --souls 1247 "CODE PUSHED"     # souls counter under the banner
 code-pushed --no-sound "QUIET"    # skip the chime
 code-pushed --dump "TEST"         # print one static frame (no animation)
 code-pushed --png out.png "TEST"  # render a frame to an image
@@ -96,7 +113,7 @@ directory (`~/.local/share/code-pushed` on Linux,
 ```
 src/cli.py                       # the whole program: rasterizer, renderer, animation, sound
 src/assets/                      # Cinzel.ttf (OFL licensed, from Google Fonts)
-code-pushed                      # launcher to run from the repo without installing
+code-pushed                           # launcher to run from the repo without installing
 shell/git-banner.sh              # git() wrapper + gitpush-test (bash/zsh)
 shell/gitpush.cmd                # Windows cmd shim
 install.sh / install.bat         # per-platform installers, idempotent
