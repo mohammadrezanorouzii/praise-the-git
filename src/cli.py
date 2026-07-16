@@ -10,8 +10,9 @@ Usage:
 
 Rendering: if PIL is available, the text is rasterized with a real serif
 font (Cinzel — the Trajan-style face Dark Souls uses — falling back to a
-system serif) and drawn with half-block characters, giving 2 antialiased
-pixels per terminal cell. Without PIL it falls back to a 5x7 bitmap font.
+system serif) and drawn with quadrant block characters, giving a 2x2 grid
+of antialiased pixels per terminal cell. Without PIL it falls back to a
+5x7 bitmap font.
 
 Supported on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 """
@@ -120,13 +121,15 @@ def load_truetype(size):
     return None
 
 
-def rasterize(text, max_cols, target_h):
+def rasterize(text, max_px, target_h, xscale=1):
     """Rasterize text with a real font -> list of pixel rows (coverage 0-255).
 
     Rendered large, then LANCZOS-downscaled to target_h pixels tall, so the
-    antialiasing survives. Returns None if PIL / fonts are unavailable.
+    antialiasing survives. xscale stretches the output horizontally to
+    compensate for non-square terminal pixels (quadrant pixels are 2x
+    taller than wide). Returns None if PIL / fonts are unavailable.
     """
-    S = 96  # supersample size
+    S = 128  # supersample size
     font = load_truetype(S)
     if font is None:
         return None
@@ -148,13 +151,15 @@ def rasterize(text, max_cols, target_h):
     img = img.crop(bbox)
 
     scale = target_h / img.height
-    tw = max(1, int(img.width * scale))
+    tw = max(1, int(img.width * scale * xscale))
     th = target_h
-    if tw > max_cols:
-        tw = max_cols
-        th = max(8, int(img.height * max_cols / img.width))
+    if tw > max_px:
+        tw = max_px
+        th = max(8, int(img.height * tw / (img.width * xscale)))
     if th % 2:
         th += 1
+    if tw % 2:
+        tw += 1
     img = img.resize((tw, th), Image.LANCZOS)
 
     px = img.load()
@@ -167,17 +172,23 @@ def fgbg(top, bot):
         int(bot[0]), int(bot[1]), int(bot[2]))
 
 
-def hires_frame(cov, cols, theme, brightness, shine_x):
-    """Render coverage rows into terminal lines using half blocks (▀).
+# quadrant glyph for each 4-bit pixel mask (bit0=TL, bit1=TR, bit2=BL, bit3=BR)
+QUADS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"
 
-    Each terminal cell shows two vertically stacked pixels: fg = top pixel,
-    bg = bottom pixel. Returns list of len(cov)//2 strings.
+
+def hires_frame(cov, cols, theme, brightness, shine_x):
+    """Render coverage rows into terminal lines using quadrant blocks.
+
+    Each terminal cell shows a 2x2 grid of pixels: the four pixels are split
+    into a bright and a dark group, drawn as the matching quadrant glyph with
+    fg = bright group average, bg = dark group average. Returns list of
+    len(cov)//2 strings.
     """
     dark, bright, glow = THEMES[theme]
     H = len(cov)
-    width = len(cov[0])
+    width = len(cov[0]) // 2  # terminal cells; 2 px per cell horizontally
     left = max(0, (cols - width) // 2)
-    sigma = max(10.0, H * 1.1)
+    sigma = max(20.0, H * 2.2)
 
     # metallic vertical gradient, brightest slightly above center
     row_base = []
@@ -200,6 +211,12 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
                 min(255.0, color[1] * f),
                 min(255.0, color[2] * f))
 
+    def avg(colors):
+        n = len(colors)
+        return (sum(c[0] for c in colors) / n,
+                sum(c[1] for c in colors) / n,
+                sum(c[2] for c in colors) / n)
+
     lines = []
     for i in range(H // 2):
         rt, rb = 2 * i, 2 * i + 1
@@ -207,9 +224,11 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
         last = None
         blanks = 0
         for c in range(width):
-            top = px_color(rt, c)
-            bot = px_color(rb, c)
-            if top == (0.0, 0.0, 0.0) and bot == (0.0, 0.0, 0.0):
+            cl, cr = 2 * c, 2 * c + 1
+            px = (px_color(rt, cl), px_color(rt, cr),
+                  px_color(rb, cl), px_color(rb, cr))
+            lum = [p[0] + p[1] + p[2] for p in px]
+            if max(lum) < 3.0:
                 blanks += 1
                 continue
             if blanks:
@@ -218,11 +237,20 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
                     last = None
                 parts.append(" " * blanks)
                 blanks = 0
-            code = fgbg(top, bot)
+            thr = (max(lum) + min(lum)) / 2
+            mask = 0
+            hi, lo = [], []
+            for b, (p, l) in enumerate(zip(px, lum)):
+                if l >= thr:
+                    mask |= 1 << b
+                    hi.append(p)
+                else:
+                    lo.append(p)
+            code = fgbg(avg(hi), avg(lo) if lo else (0, 0, 0))
             if code != last:
                 parts.append(code)
                 last = code
-            parts.append("▀")
+            parts.append(QUADS[mask])
         if last is not None:
             parts.append(BG_BLACK)
         parts.append(" " * (blanks + cols - left - width))
@@ -283,10 +311,10 @@ def bitmap_coverage(text, max_cols):
         if len(rows[0]) <= max_cols:
             break
     rows = [row[:max_cols] for row in rows]
-    # double each row so the half-block renderer can consume it
+    # double each pixel both ways so the quadrant renderer can consume it
     cov = []
     for row in rows:
-        line = [255 if p == '#' else 0 for p in row]
+        line = [255 if p == '#' else 0 for p in row for _ in (0, 1)]
         cov.append(line)
         cov.append(list(line))
     return cov
@@ -294,8 +322,8 @@ def bitmap_coverage(text, max_cols):
 
 def get_coverage(text, cols, rows):
     max_cols = cols - 4
-    text_rows = min(12, max(7, rows // 3))
-    cov = rasterize(text, max_cols, text_rows * 2)
+    text_rows = min(16, max(7, rows // 3))
+    cov = rasterize(text, max_cols * 2, text_rows * 2, xscale=2)
     if cov is None:
         cov = bitmap_coverage(text.upper(), max_cols)
     return cov
@@ -447,7 +475,7 @@ def dump_png(text, theme, out_path, shine=True):
     pad = 8
     img = Image.new("RGB", (W + 2 * pad, H + 2 * pad), (0, 0, 0))
     px = img.load()
-    sigma = max(10.0, H * 1.1)
+    sigma = max(20.0, H * 2.2)
     shine_x = W * 0.55 if shine else None
     for r in range(H):
         u = (r + 0.5) / H
@@ -465,7 +493,8 @@ def dump_png(text, theme, out_path, shine=True):
             f = a / 255.0
             px[c + pad, r + pad] = (int(color[0] * f), int(color[1] * f),
                                     int(color[2] * f))
-    img = img.resize((img.width * 4, img.height * 4), Image.NEAREST)
+    # pixels are half as wide as tall on screen: stretch 2x/4x to match
+    img = img.resize((img.width * 2, img.height * 4), Image.NEAREST)
     img.save(out_path)
     print("wrote", out_path)
 
