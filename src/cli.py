@@ -4,6 +4,8 @@ Usage:
     code-pushed                     # shows "CODE PUSHED" (gold)
     code-pushed "VICTORY ACHIEVED"  # any text
     code-pushed --red "YOU DIED"    # blood-red theme
+    code-pushed --theme silver "UNDEAD BURG"  # gold / red / silver
+    code-pushed --souls 1247 ...    # souls counter under the banner
     code-pushed --no-sound ...      # silent
     code-pushed --dump ...          # print one static frame (for testing)
     code-pushed --png out.png ...   # render a frame to an image (for testing)
@@ -65,8 +67,10 @@ else:
 # ------------------------------------------------------------- themes ----
 THEMES = {
     # (dark edge color, bright core color, glow color)
-    'gold': ((150, 96, 18), (255, 224, 130), (255, 246, 200)),
-    'red':  ((96, 6, 4),    (205, 38, 30),   (255, 120, 100)),
+    'gold':   ((150, 96, 18),  (255, 224, 130), (255, 246, 200)),
+    'red':    ((96, 6, 4),     (205, 38, 30),   (255, 120, 100)),
+    # area-name banner style ("UNDEAD BURG"): cold white/silver
+    'silver': ((105, 108, 122), (232, 235, 242), (255, 255, 255)),
 }
 
 RESET = "\x1b[0m"
@@ -286,6 +290,18 @@ FONT = {
     'X': ["#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"],
     'Y': ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],
     'Z': ["#####", "....#", "...#.", "..#..", ".#...", "#....", "#####"],
+    '0': [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."],
+    '1': ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", "#####"],
+    '2': [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"],
+    '3': [".###.", "#...#", "....#", "..##.", "....#", "#...#", ".###."],
+    '4': ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
+    '5': ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+    '6': [".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."],
+    '7': ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
+    '8': [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."],
+    '9': [".###.", "#...#", "#...#", ".####", "....#", "....#", ".###."],
+    '/': ["....#", "....#", "...#.", "..#..", ".#...", "#....", "#...."],
+    '_': [".....", ".....", ".....", ".....", ".....", ".....", "#####"],
     '!': ["#", "#", "#", "#", "#", ".", "#"],
     '?': [".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."],
     '.': [".", ".", ".", ".", ".", ".", "#"],
@@ -393,6 +409,18 @@ def play_sound():
 
 
 # ----------------------------------------------------------- animation ----
+def souls_label(souls):
+    return "✦ SOULS: {:,}".format(souls)
+
+
+def souls_sgr(theme, brightness):
+    dark, bright, _ = THEMES[theme]
+    color = lerp(dark, bright, 0.45)
+    return "\x1b[38;2;%d;%d;%dm" % (int(color[0] * brightness),
+                                    int(color[1] * brightness),
+                                    int(color[2] * brightness))
+
+
 def draw_band(out, top, cols, text_lines, pad_rows):
     blank = BG_BLACK + " " * cols + RESET
     row = top
@@ -404,7 +432,7 @@ def draw_band(out, top, cols, text_lines, pad_rows):
         out.append("\x1b[%d;1H%s" % (row, blank)); row += 1
 
 
-def animate(text, theme, sound):
+def animate(text, theme, sound, souls=None):
     size = shutil.get_terminal_size((80, 24))
     cols, rows = size.columns, size.lines
     cov = get_coverage(text, cols, rows)
@@ -443,6 +471,13 @@ def animate(text, theme, sound):
             lines = hires_frame(cov, cols, theme, b, shine)
             out = []
             draw_band(out, top, cols, lines, pad_rows)
+            if souls is not None:
+                # counter sits on the band's bottom padding row
+                label = souls_label(souls)
+                col = max(1, (cols - len(label)) // 2 + 1)
+                out.append("\x1b[%d;%dH%s%s%s%s" % (
+                    top + band_rows - 1, col, BG_BLACK,
+                    souls_sgr(theme, b), label, RESET))
             w.write("".join(out))
             w.flush()
             time.sleep(max(0.0, 1.0 / fps - ((time.monotonic() - start) % (1.0 / fps))))
@@ -451,7 +486,7 @@ def animate(text, theme, sound):
         w.flush()
 
 
-def dump(text, theme):
+def dump(text, theme, souls=None):
     """Print a single fully-lit frame (no alt screen) — for testing."""
     size = shutil.get_terminal_size((80, 24))
     cols = size.columns
@@ -462,7 +497,13 @@ def dump(text, theme):
     for line in hires_frame(cov, cols, theme, 1.0, None):
         print(line)
     print(blank)
-    print(blank)
+    if souls is None:
+        print(blank)
+        return
+    label = souls_label(souls)
+    left = max(0, (cols - len(label)) // 2)
+    print(BG_BLACK + " " * left + souls_sgr(theme, 1.0) + label
+          + BG_BLACK + " " * (cols - left - len(label)) + RESET)
 
 
 def dump_png(text, theme, out_path, shine=True):
@@ -503,7 +544,11 @@ def main():
     ap = argparse.ArgumentParser(description="Dark Souls style terminal banner")
     ap.add_argument("text", nargs="*", help='banner text (default: "CODE PUSHED")')
     ap.add_argument("--red", action="store_true", help="blood-red theme (YOU DIED)")
+    ap.add_argument("--theme", choices=sorted(THEMES),
+                    help="color theme (gold, red, silver); overrides --red")
     ap.add_argument("--no-sound", action="store_true", help="skip the chime")
+    ap.add_argument("--souls", type=int, metavar="N",
+                    help="show a souls counter under the banner (e.g. commit count)")
     ap.add_argument("--dump", action="store_true",
                     help="print one static frame and exit (testing)")
     ap.add_argument("--png", metavar="PATH",
@@ -511,19 +556,19 @@ def main():
     args = ap.parse_args()
 
     text = " ".join(args.text) if args.text else "CODE PUSHED"
-    theme = "red" if args.red else "gold"
+    theme = args.theme or ("red" if args.red else "gold")
 
     enable_vt()
     if args.png:
         dump_png(text, theme, args.png)
         return
     if args.dump:
-        dump(text, theme)
+        dump(text, theme, souls=args.souls)
         return
     if not sys.stdout.isatty():
         return  # non-interactive (scripts, CI): stay silent
     try:
-        animate(text, theme, sound=not args.no_sound)
+        animate(text, theme, sound=not args.no_sound, souls=args.souls)
     except KeyboardInterrupt:
         sys.stdout.write("\x1b[?25h\x1b[?1049l")
         sys.stdout.flush()
