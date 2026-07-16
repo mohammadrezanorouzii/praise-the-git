@@ -18,6 +18,14 @@ Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 (`--abort`/`--quit` calls and a `git stash` that had nothing to save stay
 silent; the git exit code is always preserved.)
 
+## In action
+
+| `git pull origin main` → merge conflict | `git push origin main` → pushed |
+|:---:|:---:|
+| ![YOU DIED](docs/you-died.png) | ![CODE PUSHED, with the souls counter](docs/code-pushed.png) |
+| **`git checkout -b undead-burg` → new branch** | **`git stash` → changes stashed** |
+| ![UNDEAD BURG](docs/new-branch.png) | ![HUMANITY RESTORED](docs/stash.png) |
+
 ## Install
 
 ### macOS / Linux — one-liner install
