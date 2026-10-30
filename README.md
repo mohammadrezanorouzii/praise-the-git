@@ -3,7 +3,7 @@
 *— Prepare to Push Edition —*
 
 Dark Souls banners for your git commands — metallic sheen, fade in/out,
-solemn chime, and a souls counter (your total commit count) included.
+game sound effects, and a souls counter (your total commit count) included.
 Works on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 
 | git command                  | outcome    | banner               |
@@ -51,7 +51,7 @@ Then reload your shell and check it works:
 
 ```sh
 source ~/.bashrc     # or source ~/.zshrc, or just open a new terminal
-praise-test          # golden CODE PUSHED banner + chime
+praise-test          # golden CODE PUSHED banner + sound
 ```
 
 If `praise` isn't found, `~/.local/bin` is missing from your PATH — add
@@ -118,7 +118,7 @@ praise "BONFIRE LIT"                  # any text, gold
 praise --red "YOU DIED"               # red theme
 praise --theme silver "UNDEAD BURG"   # gold / red / silver
 praise --souls 1247 "CODE PUSHED"     # souls counter under the banner
-praise --no-sound "QUIET"             # skip the chime
+praise --no-sound "QUIET"             # skip the sound
 praise --dump "TEST"                  # one static frame, no animation
 praise --png out.png "TEST"           # render a frame to an image file
 ```
@@ -142,23 +142,47 @@ non-interactive shells stay silent by design.
   it the banner falls back to a low-res built-in bitmap font)
 - A truecolor terminal (any modern terminal; on Windows 10+ VT processing
   is enabled automatically)
-- Sound is built in: `winsound` on Windows, `afplay` on macOS,
+- Bundled sound playback uses: `winsound` on Windows, `afplay` on macOS,
   `paplay`/`aplay`/`ffplay` on Linux — whichever exists; silence otherwise
+
+## High-resolution graphics
+
+On Kitty, WezTerm, and Ghostty, `praise` automatically uses the Kitty
+terminal graphics protocol to draw smooth, high-resolution text. Other
+terminals use the block renderer. Automatic detection falls back to blocks
+inside tmux or screen; support for graphics through a multiplexer depends on
+its configuration. Pillow and a usable TrueType font are required.
+
+```sh
+praise --graphics kitty "VICTORY ACHIEVED"  # force graphics in a supported terminal
+praise --graphics blocks "VICTORY ACHIEVED" # use the block renderer
+export PRAISE_GRAPHICS=kitty                  # use graphics for git and praise-test
+praise-test victory
+unset PRAISE_GRAPHICS                        # return to automatic detection
+```
+
+Only force `kitty` when the terminal and any multiplexer support the Kitty
+graphics protocol; otherwise the image may not appear. For a file preview,
+use `praise --graphics kitty --png preview.png "TEST"`. `--dump` always
+prints a static block frame. The graphics banner fades in and out; the moving
+shine is available in the block renderer.
 
 ## How sound effects work
 
-A solemn chord swell is synthesized (pure stdlib, no audio dependencies)
-on first run and saved into the app's data directory:
+The bundled effects are sourced from Dark Souls sound clips: boss defeat for
+push, a shortened item pickup for victory, death for failure, fog gate for a new branch,
+and humanity for stash. The clips were obtained from [Soundsverse](https://soundsverse.com/dark-souls)
+and [Myinstants](https://www.myinstants.com/en/instant/you-defeatedvictory-achieved/).
+The sites are third-party sources; rights to the original game audio belong
+to their respective owners. Check the rights before redistributing the clips.
+Playback uses `winsound` on Windows, `afplay` on macOS, or `paplay`, `aplay`,
+or `ffplay` on Linux.
 
-- Linux: `~/.local/share/praise-the-git/chime.wav`
-- macOS: `~/Library/Application Support/praise-the-git/chime.wav`
-- Windows: `%LOCALAPPDATA%\praise-the-git\chime.wav`
-
-Playback uses whatever the OS provides: `winsound` on Windows, `afplay`
-on macOS, `paplay`/`aplay`/`ffplay` on Linux — silence if none exists.
-Want a different sound? Replace that `chime.wav` with any `.wav` file
-(e.g. the real "Victory Achieved" sound) and it plays instead. Delete it
-to get the synthesized one back.
+Use `praise --sound push|victory|fail|branch|stash "TEXT"` to select an
+effect explicitly, or `--no-sound` for silence. Banners use up to eight terminal rows per line and wrap long messages to
+keep the letters detailed. They shrink to fit small windows. Terminal block
+graphics have limited resolution; larger terminal windows and smaller
+terminal fonts help.
 
 ## Uninstall
 
@@ -174,7 +198,7 @@ pipx uninstall praise-the-git        # pipx install
 pip uninstall praise-the-git         # pip install
 rm ~/.local/bin/praise               # symlink fallback
 
-# 3. remove the downloaded app and the generated sound file
+# 3. remove the downloaded app and its data
 rm -rf ~/.local/share/praise-the-git
 ```
 
@@ -188,7 +212,7 @@ rem 2. find and delete the gitpush shim
 where gitpush
 del "<the path that 'where gitpush' printed>"
 
-rem 3. remove the downloaded app and the generated sound file
+rem 3. remove the downloaded app and its data
 rmdir /s /q "%LOCALAPPDATA%\praise-the-git"
 ```
 
