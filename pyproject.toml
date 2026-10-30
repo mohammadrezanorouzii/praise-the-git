@@ -24,4 +24,4 @@ packages = ["praise_the_git", "praise_the_git.assets"]
 package-dir = { praise_the_git = "src" }
 
 [tool.setuptools.package-data]
-praise_the_git = ["assets/*.ttf"]
+praise_the_git = ["assets/*.ttf", "assets/sounds/*.wav"]

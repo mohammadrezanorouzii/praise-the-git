@@ -10,18 +10,18 @@ Usage:
     praise --dump ...          # print one static frame (for testing)
     praise --png out.png ...   # render a frame to an image (for testing)
 
-Rendering: if PIL is available, the text is rasterized with a real serif
-font (Cinzel — the Trajan-style face Dark Souls uses — falling back to a
-system serif) and drawn with quadrant block characters, giving a 2x2 grid
-of antialiased pixels per terminal cell. Without PIL it falls back to a
-5x7 bitmap font.
+Banners use the bundled Cinzel font via Pillow, rendered with antialiased
+terminal block characters.
 
 Supported on Linux, macOS, and Windows 10+ (cmd / Windows Terminal).
 """
 
 import argparse
+import base64
+import io
 import math
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -139,16 +139,20 @@ def rasterize(text, max_px, target_h, xscale=1):
         return None
     from PIL import Image, ImageDraw
 
-    tracking = int(S * 0.13)  # Dark Souls style wide letter-spacing
+    # Moderate tracking leaves room for fine serifs at small grid sizes.
+    # Pair advances preserve the font's kerning (e.g. AV and WA).
+    tracking = S * 0.08
     tmp = ImageDraw.Draw(Image.new("L", (8, 8)))
-    widths = [tmp.textlength(ch, font=font) for ch in text]
-    W = int(sum(widths)) + tracking * max(0, len(text) - 1) + 2 * S
+    positions = [0.0]
+    for i, ch in enumerate(text[:-1]):
+        advance = (tmp.textlength(ch + text[i + 1], font=font)
+                   - tmp.textlength(text[i + 1], font=font))
+        positions.append(positions[-1] + advance + tracking)
+    W = int(positions[-1] + tmp.textlength(text[-1], font=font) + 2 * S) if text else 2 * S
     img = Image.new("L", (W, S * 2), 0)
     d = ImageDraw.Draw(img)
-    x = float(S // 2)
-    for ch, w in zip(text, widths):
-        d.text((x, S // 2), ch, font=font, fill=255)
-        x += w + tracking
+    for ch, x in zip(text, positions):
+        d.text((S // 2 + x, S // 2), ch, font=font, fill=255)
     bbox = img.getbbox()
     if bbox is None:
         return None
@@ -159,11 +163,10 @@ def rasterize(text, max_px, target_h, xscale=1):
     th = target_h
     if tw > max_px:
         tw = max_px
-        th = max(8, int(img.height * tw / (img.width * xscale)))
-    if th % 2:
-        th += 1
-    if tw % 2:
-        tw += 1
+        th = max(2, int(img.height * tw / (img.width * xscale)))
+    # Round down within the limits; never overflow the available columns.
+    th = max(2, th - th % 2)
+    tw = max(2, tw - tw % 2)
     img = img.resize((tw, th), Image.LANCZOS)
 
     px = img.load()
@@ -178,6 +181,45 @@ def fgbg(top, bot):
 
 # quadrant glyph for each 4-bit pixel mask (bit0=TL, bit1=TR, bit2=BL, bit3=BR)
 QUADS = " ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"
+
+
+def split_cell(pixels):
+    """Choose the two colors that best approximate four pixel colors.
+
+    Quadrant characters can only represent two colors in a cell. Try each
+    possible split in brightness order and choose the least squared RGB error.
+    """
+    order = sorted(range(4), key=lambda i: sum(pixels[i]))
+    best = None
+    for cut in range(1, 5):
+        low, high = order[:cut], order[cut:]
+        def average(group):
+            return tuple(sum(pixels[i][c] for i in group) / len(group)
+                         for c in range(3)) if group else (0, 0, 0)
+        lo, hi = average(low), average(high)
+        error = sum((pixels[i][c] - (lo if i in low else hi)[c]) ** 2
+                    for i in range(4) for c in range(3))
+        if best is None or error < best[0]:
+            best = (error, sum(1 << i for i in high), hi, lo)
+    _, mask, fg, bg = best
+    return mask, fg, bg
+
+
+def gradient_positions(cov):
+    """Restart the metallic gradient for each line of a wrapped banner."""
+    positions = [0.5] * len(cov)
+    start = 0
+    while start < len(cov):
+        if not any(cov[start]):
+            start += 1
+            continue
+        end = start + 1
+        while end < len(cov) and any(cov[end]):
+            end += 1
+        for r in range(start, end):
+            positions[r] = (r - start + 0.5) / (end - start)
+        start = end
+    return positions
 
 
 def hires_frame(cov, cols, theme, brightness, shine_x):
@@ -196,8 +238,7 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
 
     # metallic vertical gradient, brightest slightly above center
     row_base = []
-    for r in range(H):
-        u = (r + 0.5) / H
+    for u in gradient_positions(cov):
         wgt = 0.40 + 0.60 * math.exp(-((u - 0.40) / 0.30) ** 2)
         row_base.append(lerp(dark, bright, wgt))
 
@@ -214,12 +255,6 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
         return (min(255.0, color[0] * f),
                 min(255.0, color[1] * f),
                 min(255.0, color[2] * f))
-
-    def avg(colors):
-        n = len(colors)
-        return (sum(c[0] for c in colors) / n,
-                sum(c[1] for c in colors) / n,
-                sum(c[2] for c in colors) / n)
 
     lines = []
     for i in range(H // 2):
@@ -241,16 +276,8 @@ def hires_frame(cov, cols, theme, brightness, shine_x):
                     last = None
                 parts.append(" " * blanks)
                 blanks = 0
-            thr = (max(lum) + min(lum)) / 2
-            mask = 0
-            hi, lo = [], []
-            for b, (p, l) in enumerate(zip(px, lum)):
-                if l >= thr:
-                    mask |= 1 << b
-                    hi.append(p)
-                else:
-                    lo.append(p)
-            code = fgbg(avg(hi), avg(lo) if lo else (0, 0, 0))
+            mask, fg, bg = split_cell(px)
+            code = fgbg(fg, bg)
             if code != last:
                 parts.append(code)
                 last = code
@@ -336,60 +363,131 @@ def bitmap_coverage(text, max_cols):
     return cov
 
 
-def get_coverage(text, cols, rows):
-    max_cols = cols - 4
-    text_rows = min(16, max(7, rows // 3))
-    cov = rasterize(text, max_cols * 2, text_rows * 2, xscale=2)
-    if cov is None:
-        cov = bitmap_coverage(text.upper(), max_cols)
-    return cov
+def get_coverage(text, cols, rows, scale=1):
+    """Fit a large, antialiased banner into the terminal, wrapping words.
+
+    Wrapping retains detail for long messages rather than shrinking the whole
+    sentence to a few pixels. Leave space for the band and souls counter.
+    """
+    max_cols = max(1, cols - 4)
+    max_px = max_cols * 2 * scale
+    max_rows = max(1, rows - 4)
+    words = text.split()
+    if not words:
+        return [[0] * (2 * scale) for _ in range(2 * scale)]
+
+    # Try the largest height first, reducing it only if the wrapped banner
+    # would exceed the available screen height.
+    for text_rows in range(min(8, max_rows), 0, -1):
+        lines = []
+        line = ""
+        word_too_wide = False
+        for word in words:
+            candidate = (line + " " + word).strip()
+            # Measure at the requested height before applying the width limit.
+            measured = rasterize(candidate, 10000000, text_rows * 2 * scale, xscale=2)
+            if measured is None:
+                fallback = bitmap_coverage(text.upper(), max_cols)
+                if len(fallback) > max_rows * 2:
+                    height = max_rows * 2
+                    fallback = [fallback[i * len(fallback) // height]
+                                for i in range(height)]
+                return fallback
+            if line and len(measured[0]) > max_px:
+                lines.append(line)
+                line = word
+                single = rasterize(word, 10000000, text_rows * 2 * scale, xscale=2)
+                word_too_wide |= len(single[0]) > max_px
+            elif not line and len(measured[0]) > max_px:
+                line = word
+                word_too_wide = True
+            else:
+                line = candidate
+        lines.append(line)
+        if word_too_wide and text_rows > 1:
+            continue
+        images = [rasterize(line, max_px, text_rows * 2 * scale, xscale=2)
+                  for line in lines]
+        images = [image for image in images if image is not None]
+        height = sum(len(image) for image in images) + 2 * scale * (len(images) - 1)
+        if height <= max_rows * 2 * scale:
+            break
+        if text_rows == 1:
+            # Extremely small terminals or very long input: fit one line.
+            images = [rasterize(text, max_px, max_rows * 2 * scale, xscale=2)]
+            break
+
+    # Center each line on a common canvas. Each blank separator is one cell high.
+    width = max(len(image[0]) for image in images)
+    result = []
+    for i, image in enumerate(images):
+        if i:
+            result.extend([[0] * width for _ in range(2 * scale)])
+        left = (width - len(image[0])) // 2
+        right = width - len(image[0]) - left
+        result.extend([[0] * left + row + [0] * right for row in image])
+    unit = 2 * scale
+    padded_width = ((width + unit - 1) // unit) * unit
+    result = [row + [0] * (padded_width - width) for row in result]
+    while len(result) % unit:
+        result.append([0] * padded_width)
+    return result
+
+
+def graphics_supported():
+    """Conservatively detect direct terminals with kitty graphics support."""
+    if os.environ.get("TMUX") or os.environ.get("STY"):
+        return False
+    return (bool(os.environ.get("KITTY_WINDOW_ID"))
+            or os.environ.get("TERM") == "xterm-kitty"
+            or os.environ.get("TERM_PROGRAM", "").lower() in ("wezterm", "ghostty"))
+
+
+def graphics_image(cov, theme):
+    """Create a full-resolution RGB banner, without quadrant quantization."""
+    from PIL import Image
+    dark, bright, _ = THEMES[theme]
+    height, width = len(cov), len(cov[0])
+    img = Image.new("RGB", (width, height))
+    px = img.load()
+    for row, u in enumerate(gradient_positions(cov)):
+        weight = 0.40 + 0.60 * math.exp(-((u - 0.40) / 0.30) ** 2)
+        color = lerp(dark, bright, weight)
+        for col, alpha in enumerate(cov[row]):
+            if alpha:
+                px[col, row] = tuple(int(value * alpha / 255) for value in color)
+    # Terminal cells are approximately twice as tall as they are wide.
+    return img.resize((width, height * 2), Image.Resampling.LANCZOS
+                      if hasattr(Image, "Resampling") else Image.LANCZOS)
+
+
+def kitty_frame(img, brightness, image_id, cols, rows):
+    """Encode a graphics-protocol frame in bounded base64 chunks."""
+    table = [int(i * brightness) for i in range(256)] * 3
+    frame = img.point(table)
+    buf = io.BytesIO()
+    frame.save(buf, format="PNG")
+    payload = base64.b64encode(buf.getvalue()).decode("ascii")
+    chunks = [payload[i:i + 4096] for i in range(0, len(payload), 4096)]
+    parts = []
+    for index, chunk in enumerate(chunks):
+        more = int(index < len(chunks) - 1)
+        control = ("a=T,f=100,i=%d,c=%d,r=%d,C=1,q=2," %
+                   (image_id, cols, rows)) if index == 0 else ""
+        parts.append("\x1b_G%sm=%d;%s\x1b\\" % (control, more, chunk))
+    return "".join(parts)
 
 
 # -------------------------------------------------------------- sound ----
-def sound_path():
-    os.makedirs(DATA_DIR, exist_ok=True)
-    return os.path.join(DATA_DIR, "chime.wav")
+SOUNDS = {
+    "push": "push.wav", "victory": "victory.wav",
+    "fail": "fail.wav", "branch": "branch.wav", "stash": "stash.wav",
+}
 
 
-def synth_chime(path):
-    """Synthesize a solemn orchestral-swell style chime (pure stdlib)."""
-    import struct
-    import wave
-    rate = 22050
-    dur = 3.0
-    n = int(rate * dur)
-    partials = [
-        (110.00, 1.00), (164.81, 0.65), (220.00, 0.55),
-        (261.63, 0.35), (329.63, 0.18),
-    ]
-    samples = []
-    for i in range(n):
-        t = i / rate
-        if t < 0.5:
-            env = (t / 0.5) ** 2
-        else:
-            env = math.exp(-(t - 0.5) / 1.1)
-        v = 0.0
-        for f, a in partials:
-            vib = 1.0 + 0.002 * math.sin(2 * math.pi * 5.0 * t)
-            v += a * math.sin(2 * math.pi * f * vib * t)
-        v += 0.9 * math.exp(-t / 0.25) * math.sin(2 * math.pi * 55.0 * t)
-        samples.append(v * env)
-    # normalize to 95% of full scale — as loud as possible without clipping
-    gain = 0.95 / (max(abs(s) for s in samples) or 1.0)
-    pcm = [int(max(-1.0, min(1.0, s * gain)) * 32767) for s in samples]
-    with wave.open(path, "w") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(rate)
-        w.writeframes(struct.pack("<%dh" % n, *pcm))
-
-
-def play_sound():
-    path = sound_path()
+def play_sound(kind):
+    path = os.path.join(PKG_DIR, "assets", "sounds", SOUNDS[kind])
     try:
-        if not os.path.exists(path):
-            synth_chime(path)
         if os.name == "nt":
             import winsound
             winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
@@ -404,8 +502,8 @@ def play_sound():
                 subprocess.Popen(player, stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL)
                 return
-    except Exception:
-        pass  # sound is best-effort, never break the banner
+    except OSError:
+        pass
 
 
 # ----------------------------------------------------------- animation ----
@@ -432,14 +530,18 @@ def draw_band(out, top, cols, text_lines, pad_rows):
         out.append("\x1b[%d;1H%s" % (row, blank)); row += 1
 
 
-def animate(text, theme, sound, souls=None):
+def animate(text, theme, sound, souls=None, graphics=False):
     size = shutil.get_terminal_size((80, 24))
     cols, rows = size.columns, size.lines
-    cov = get_coverage(text, cols, rows)
+    scale = 4 if graphics else 1
+    cov = get_coverage(text, cols, rows, scale=scale)
     width = len(cov[0])
-
+    image = graphics_image(cov, theme) if graphics else None
+    image_id = secrets.randbelow(2**31 - 1) + 1 if graphics else None
+    cell_width = len(cov[0]) // (2 * scale)
+    cell_height = len(cov) // (2 * scale)
     pad_rows = 2
-    band_rows = len(cov) // 2 + 2 * pad_rows
+    band_rows = cell_height + 2 * pad_rows
     top = max(1, (rows - band_rows) // 2 + 1)
 
     fade_in, hold, fade_out = 0.55, 1.5, 0.9
@@ -450,7 +552,7 @@ def animate(text, theme, sound, souls=None):
     w.write("\x1b[?1049h\x1b[?25l\x1b[2J")  # alt screen, hide cursor, clear
     w.flush()
     if sound:
-        play_sound()
+        play_sound(sound)
     try:
         start = time.monotonic()
         while True:
@@ -468,9 +570,19 @@ def animate(text, theme, sound, souls=None):
                 b = 1.0 - (t - fade_in - hold) / fade_out
                 shine = None
             b = b * b * (3 - 2 * b)  # smoothstep
-            lines = hires_frame(cov, cols, theme, b, shine)
+            if graphics:
+                lines = [BG_BLACK + " " * cols + RESET] * cell_height
+            else:
+                lines = hires_frame(cov, cols, theme, b, shine)
             out = []
             draw_band(out, top, cols, lines, pad_rows)
+            if graphics:
+                # Delete only our previous frame, then place the next at the
+                # same coordinates without moving the cursor.
+                left = max(1, (cols - cell_width) // 2 + 1)
+                out.append("\x1b_Ga=d,d=I,i=%d,q=2\x1b\\" % image_id)
+                out.append("\x1b[%d;%dH" % (top + pad_rows, left))
+                out.append(kitty_frame(image, b, image_id, cell_width, cell_height))
             if souls is not None:
                 # counter sits on the band's bottom padding row
                 label = souls_label(souls)
@@ -482,6 +594,8 @@ def animate(text, theme, sound, souls=None):
             w.flush()
             time.sleep(max(0.0, 1.0 / fps - ((time.monotonic() - start) % (1.0 / fps))))
     finally:
+        if graphics:
+            w.write("\x1b_Ga=d,d=I,i=%d,q=2\x1b\\" % image_id)
         w.write("\x1b[?25h\x1b[?1049l")  # restore cursor + screen
         w.flush()
 
@@ -506,10 +620,15 @@ def dump(text, theme, souls=None):
           + BG_BLACK + " " * (cols - left - len(label)) + RESET)
 
 
-def dump_png(text, theme, out_path, shine=True):
+def dump_png(text, theme, out_path, shine=True, graphics=False):
     """Render one frame to a PNG (pixel-accurate preview) — for testing."""
     from PIL import Image
     size = shutil.get_terminal_size((80, 24))
+    if graphics:
+        image = graphics_image(get_coverage(text, size.columns, size.lines, scale=4), theme)
+        image.save(out_path)
+        print("wrote", out_path)
+        return
     cov = get_coverage(text, size.columns, size.lines)
     dark, bright, glow = THEMES[theme]
     H, W = len(cov), len(cov[0])
@@ -518,8 +637,7 @@ def dump_png(text, theme, out_path, shine=True):
     px = img.load()
     sigma = max(20.0, H * 2.2)
     shine_x = W * 0.55 if shine else None
-    for r in range(H):
-        u = (r + 0.5) / H
+    for r, u in enumerate(gradient_positions(cov)):
         wgt = 0.40 + 0.60 * math.exp(-((u - 0.40) / 0.30) ** 2)
         base = lerp(dark, bright, wgt)
         for c in range(W):
@@ -534,6 +652,16 @@ def dump_png(text, theme, out_path, shine=True):
             f = a / 255.0
             px[c + pad, r + pad] = (int(color[0] * f), int(color[1] * f),
                                     int(color[2] * f))
+    # Match the terminal's two-color quadrant approximation, not the
+    # unquantized source image, so the preview shows actual grid detail.
+    for r in range(0, H, 2):
+        for c in range(0, W, 2):
+            coords = ((c, r), (c + 1, r), (c, r + 1), (c + 1, r + 1))
+            colors = [px[x + pad, y + pad] for x, y in coords]
+            mask, fg, bg = split_cell(colors)
+            for bit, (x, y) in enumerate(coords):
+                color = fg if mask & (1 << bit) else bg
+                px[x + pad, y + pad] = tuple(int(v) for v in color)
     # pixels are half as wide as tall on screen: stretch 2x/4x to match
     img = img.resize((img.width * 2, img.height * 4), Image.NEAREST)
     img.save(out_path)
@@ -548,7 +676,11 @@ def main():
     ap.add_argument("--red", action="store_true", help="blood-red theme (YOU DIED)")
     ap.add_argument("--theme", choices=sorted(THEMES),
                     help="color theme (gold, red, silver); overrides --red")
-    ap.add_argument("--no-sound", action="store_true", help="skip the chime")
+    ap.add_argument("--graphics", choices=("auto", "blocks", "kitty"),
+                    default=os.environ.get("PRAISE_GRAPHICS", "auto"),
+                    help="rendering mode (default: auto; PRAISE_GRAPHICS also supported)")
+    ap.add_argument("--sound", choices=sorted(SOUNDS), help="choose an effect")
+    ap.add_argument("--no-sound", action="store_true", help="skip the sound")
     ap.add_argument("--souls", type=int, metavar="N",
                     help="show a souls counter under the banner (e.g. commit count)")
     ap.add_argument("--dump", action="store_true",
@@ -560,9 +692,16 @@ def main():
     text = " ".join(args.text) if args.text else "CODE PUSHED"
     theme = args.theme or ("red" if args.red else "gold")
 
+    if args.graphics not in ("auto", "blocks", "kitty"):
+        ap.error("PRAISE_GRAPHICS must be auto, blocks, or kitty")
+    graphics = (args.graphics == "kitty" or
+                (args.graphics == "auto" and graphics_supported()))
+    if graphics and load_truetype(128) is None:
+        graphics = False
+
     enable_vt()
     if args.png:
-        dump_png(text, theme, args.png)
+        dump_png(text, theme, args.png, graphics=graphics)
         return
     if args.dump:
         dump(text, theme, souls=args.souls)
@@ -570,7 +709,9 @@ def main():
     if not sys.stdout.isatty():
         return  # non-interactive (scripts, CI): stay silent
     try:
-        animate(text, theme, sound=not args.no_sound, souls=args.souls)
+        kind = args.sound or ({"CODE PUSHED": "push", "VICTORY ACHIEVED": "victory",
+                               "YOU DIED": "fail", "HUMANITY RESTORED": "stash"}.get(text.upper(), "branch" if theme == "silver" else "push"))
+        animate(text, theme, sound=None if args.no_sound else kind, souls=args.souls, graphics=graphics)
     except KeyboardInterrupt:
         sys.stdout.write("\x1b[?25h\x1b[?1049l")
         sys.stdout.flush()

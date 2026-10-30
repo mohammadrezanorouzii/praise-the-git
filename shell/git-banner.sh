@@ -70,7 +70,7 @@ git() {
         local _br
         _br=$(command git branch --show-current 2>/dev/null)
         if [ -n "$_br" ]; then
-          "$PRAISE_BIN" --theme silver \
+          "$PRAISE_BIN" --sound branch --theme silver \
             "$(printf '%s' "$_br" | tr '[:lower:]' '[:upper:]')"
         fi
       fi
@@ -90,7 +90,7 @@ praise-test() {
   case "${1:-}" in
     fail)    "$PRAISE_BIN" --red "YOU DIED" ;;
     victory) _praise_victory "VICTORY ACHIEVED" ;;
-    branch)  "$PRAISE_BIN" --theme silver "UNDEAD BURG" ;;
+    branch)  "$PRAISE_BIN" --sound branch --theme silver "UNDEAD BURG" ;;
     stash)   "$PRAISE_BIN" --theme silver "HUMANITY RESTORED" ;;
     *)       _praise_victory "CODE PUSHED" ;;
   esac
